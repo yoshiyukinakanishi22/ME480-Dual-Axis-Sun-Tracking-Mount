@@ -12,20 +12,25 @@
 #define ldrALPin  35
 #define ldrFRPin  32
 #define ldrARPin  33
-#define ldrLaUpPin   25
-#define ldrLaDownPin 26
+#define ldrLaUPPin   26
+#define ldrLaDOWNPin 27
 // 35, 34 top two LDRs
 // 32, 33 middle two LDRs
 // 26, 27 bottom two LDRssx
 #define rotStepPin 14
 #define rotDirPin 13
-#define laSpeedPin 12
-#define laDirPin 15
+#define linactENA 15
+#define linactIN1 2
+#define linactIN2 4
+
+
 
 int ldrFLStatus;
 int ldrALStatus;
 int ldrFRStatus;
 int ldrARStatus;
+int ldrLaUpStatus;
+int ldrLaDownStatus;
 int rpm = 400;
 
 Stepper myStepper (100, rotStepPin, rotDirPin); //set STEPS to 100 if error
@@ -36,7 +41,8 @@ int readingsFL[5];
 int readingsAL[5];
 int readingsFR[5];
 int readingsAR[5];
-
+int readingsLaUP[5];
+int readingsLaDOWN[5];
 int totalFL = 0;
 float averageFL = 0;
 int totalAL = 0;
@@ -45,6 +51,10 @@ int totalFR = 0;
 float averageFR = 0;
 int totalAR = 0;
 float averageAR = 0;
+int totalLaUP = 0;
+float averageLaUP = 0;
+int totalLaDOWN = 0;
+float averageLaDOWN = 0;
 
 void setup() {
   // Sets the two pins as Outputs
@@ -54,12 +64,13 @@ void setup() {
   pinMode(ldrALPin, INPUT);
   pinMode(ldrFRPin, INPUT);
   pinMode(ldrARPin, INPUT);
-  pinMode(ldrLaUpPin, INPUT);
-  pinMode(ldrLaDownPin, INPUT);
+  pinMode(ldrLaUPPin, INPUT);
+  pinMode(ldrLaDOWNPin, INPUT);
   pinMode(rotStepPin, OUTPUT);
   pinMode(rotDirPin, OUTPUT);
-  pinMode(laSpeedPin, OUTPUT);
-  pinMode(laDirPin, OUTPUT);
+  pinMode(linactENA, OUTPUT);
+  pinMode(linactIN1, OUTPUT);
+  pinMode(linactIN2, OUTPUT);
   analogSetAttenuation(ADC_11db);
   //myStepper.setSpeed(rpm);
   
@@ -72,8 +83,7 @@ void setup() {
     readingsLaUP[i] = 0;
     readingsLaDOWN[i] = 0;
   }
-  digitalWrite(laSpeedPin, HIGH);
-  digitalWrite(laDirPin, HIGH);
+  digitalWrite(linactENA, HIGH);
 }
 
 void loop() {
@@ -82,8 +92,8 @@ void loop() {
   ldrALStatus = analogRead(ldrALPin);
   ldrFRStatus = analogRead(ldrFRPin);
   ldrARStatus = analogRead(ldrARPin);
-  ldrLaUpStatus = analogRead(ldrLaUpPin);
-  ldrLaDownStatus = analogRead(ldrLaDownPin);
+  ldrLaUpStatus = analogRead(ldrLaUPPin);
+  ldrLaDownStatus = analogRead(ldrLaDOWNPin);
 
   // Take the Moving Average of the last 5 readings
   totalFL = totalFL - readingsFL[readIndex];
@@ -123,50 +133,61 @@ void loop() {
   int diffLeft = averageFL - averageAL;
   int diffRight = averageFR - averageAR;
   int dod = diffLeft - diffRight;
-  int diffLa = averageLaUP - averageLaDOWN;
+  int diffLA = averageLaUP - averageLaDOWN;
 
-  if (dod >= 300){
-     // When dod is positive, that means left side is getting more sunlight
-      Serial.print("Out of Range DOD Pos");	    
-      Serial.println(dod);
-      Serial.print("34: "); Serial.println(averageFL);
-      Serial.print("35: "); Serial.println(averageAL);
-      Serial.print("32: "); Serial.println(averageFR);
-      Serial.print("33: "); Serial.println(averageAR);
-      myStepper.step(50);
-    }
-  else if (dod <= -700){
-      Serial.print("Out of Range DOD Neg");	    
-      Serial.println(dod);
-      Serial.print("34: "); Serial.println(averageFL);
-      Serial.print("35: "); Serial.println(averageAL);
-      Serial.print("32: "); Serial.println(averageFR);
-      Serial.print("33: "); Serial.println(averageAR);
-    	myStepper.step(-50);
-  }
-  else{
-    Serial.println("Within Range");
-    Serial.print("34: "); Serial.println(averageFL);
-    Serial.print("35: "); Serial.println(averageAL);
-    Serial.print("32: "); Serial.println(averageFR);
-    Serial.print("33: "); Serial.println(averageAR);
+  // if (dod >= 300){
+  //    // When dod is positive, that means left side is getting more sunlight
+  //     Serial.print("Out of Range DOD Pos");	    
+  //     Serial.println(dod);
+  //     Serial.print("34: "); Serial.println(averageFL);
+  //     Serial.print("35: "); Serial.println(averageAL);
+  //     Serial.print("32: "); Serial.println(averageFR);
+  //     Serial.print("33: "); Serial.println(averageAR);
+  //     myStepper.step(50);
+  //   }
+  // else if (dod <= -700){
+  //     Serial.print("Out of Range DOD Neg");	    
+  //     Serial.println(dod);
+  //     Serial.print("34: "); Serial.println(averageFL);
+  //     Serial.print("35: "); Serial.println(averageAL);
+  //     Serial.print("32: "); Serial.println(averageFR);
+  //     Serial.print("33: "); Serial.println(averageAR);
+  //   	myStepper.step(-50);
+  // }
+  // else{
+  //   Serial.println("Within Range");
+  //   Serial.print("34: "); Serial.println(averageFL);
+  //   Serial.print("35: "); Serial.println(averageAL);
+  //   Serial.print("32: "); Serial.println(averageFR);
+  //   Serial.print("33: "); Serial.println(averageAR);
     
-  }
+  // }
 
   if (diffLA >= 400){
     // Extend LA
-    digitalWrite(laSpeedPin, LOW);
-    digitalWrite(laDirPin, HIGH);
+    Serial.println("Retracting");
+    Serial.println(averageLaUP);
+    Serial.println(averageLaDOWN);
+    digitalWrite(linactIN1, LOW);
+    digitalWrite(linactIN2, HIGH);
   }
   else if (diffLA <= -400){
     // Retracts LA
-    digitalWrite(laSpeedPin, HIGH);
-    digitalWrite(laDirPin, LOW);
+    Serial.println("Extending");
+    Serial.println(averageLaUP);
+    Serial.println(averageLaDOWN);
+    digitalWrite(linactIN1, HIGH);
+    digitalWrite(linactIN2, LOW);
   }
   else{
     // Stop Actuator
-    digitalWrite(laSpeedPin, HIGH);
-    digitalWrite(laSpeedPin, HIGH);
+    // digitalWrite(laSpeedPin, HIGH);
+    // digitalWrite(laSpeedPin, HIGH);
+    Serial.println("Stay Same");
+    Serial.println(averageLaUP);
+    Serial.println(averageLaDOWN);
+    digitalWrite(linactIN1, HIGH);
+    digitalWrite(linactIN2, HIGH);
   }
   }
 
